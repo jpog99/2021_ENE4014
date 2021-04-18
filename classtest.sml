@@ -18,14 +18,13 @@ true_of_all_constants((fn x => x mod 2 = 0),e)
 
 fun true_of_some_constants f e m =
     let
-        val count = 0
+        
 
-        (case e of 
+    in  
+            (case e of 
               Constant i => if f i then count + 1 else count
             | Negate i1 =>  if (true_of_some_constants f i1) then count + 1 else count
             | Add (a,b) =>  if (true_of_some_constants f a  orelse true_of_some_constants f b) then count + 1 else count
             | Multiply (c,d) => if (true_of_some_constants f c  orelse true_of_some_constants f d) then count + 1 else count )
          
-    in  
-        count >= m
     end
