@@ -15,22 +15,24 @@ andalso true_of_all_constants(f,e2)
 fun all_even_exp e =
 true_of_all_constants((fn x => x mod 2 = 0),e)
   
-
- fun count_of_true_constants (f,e) =
-    let
-        val count = 0
-
-    in  
-            (case e of 
-              Constant i => if f i then count+1 else count
-            | Negate i1 =>  count_of_true_constants (f,i1)
-            | Add (a,b) =>  count_of_true_constants (f,a)  + count_of_true_constants (f,b) 
-            | Multiply (a,b) => count_of_true_constants (f,a)  + count_of_true_constants (f,b))
-
-    end 
-
 fun true_of_some_constants f e m = 
+  let
+    fun count_of_true_constants (f,e) =
+      let
+          val count = 0
+      in  
+              (case e of 
+                Constant i => if f i then count+1 else count
+              | Negate i1 =>  count_of_true_constants (f,i1)
+              | Add (a,b) =>  count_of_true_constants (f,a)  + count_of_true_constants (f,b) 
+              | Multiply (a,b) => count_of_true_constants (f,a)  + count_of_true_constants (f,b))
+      end 
+  in
     count_of_true_constants(f,e) >= m
+  end
+      
+
+
 
 (*from chapter 2*)
 fun apply_f f x y =
@@ -96,3 +98,43 @@ fun true_div x y =
   in
     aux(f, f x)
   end
+
+(*practice from website*)
+
+(*map func with tail rec*)
+fun tailmap f xs = 
+  let 
+    fun aux f acc ls = 
+      case ls of
+        [] => acc
+        |x::xs => aux f (f x::acc) xs
+
+    val reverse = fn l => case l of []=>[] | a::b=> reverse b @ [a]
+  in
+    reverse(aux f [] xs)
+  end
+
+(*filter func with tail rec*)
+fun tailfilter f xs = 
+  let
+    fun aux f acc ls = 
+      case ls of
+        [] => acc
+        |x::xs => if f x
+                  then aux f (x :: acc) xs
+                  else aux f acc xs
+    
+    val reverse = fn l => case l of []=>[] | a::b=> reverse b @ [a]
+  in
+    reverse(aux f [] xs)
+  end    
+
+fun tail_countdown x = 
+  let
+    fun aux n xs =
+      if n=0
+      then xs
+      else aux (n-1) (xs @ [n])
+  in
+    aux x []
+  end          
