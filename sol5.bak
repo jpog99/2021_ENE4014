@@ -88,10 +88,6 @@
 ;; "in real life" it would be a helper function of eval-exp.
 
 ;;ADDED EVAL-UNDER-GENV FOR GLET (ADDITIONAL REQ)
-(define (combine xs ys)
-          (if (null? xs) ys	
-              (cons (car xs) (combine (cdr xs) ys))))
-
 (define (eval-under-genv e env genv)
   (cond [(var? e) 
          (envlookup env (var-string e))]
@@ -124,25 +120,24 @@
         ;;case 4: mlet expression
         [(mlet? e)
          (letrec ([v (eval-under-genv (mlet-e e) env genv)]
-                  [newenv (cons (cons (mlet-var e) v) env)])
+                  [newenv (cons (cons (mlet-var e) v) env genv)])
            (eval-under-genv (mlet-body e) newenv genv))]
 
         ;;case 5: fun and call expression
         [(fun? e) (closure env e)]
-        
+
         [(call? e)
          (let ([v1 (eval-under-genv (call-funexp e) env genv)]
                [v2 (eval-under-genv (call-actual e) env genv)])
-           
            (if (closure? v1)
                (letrec ([clfun (closure-fun v1)]
-                        [clenv (combine genv (closure-env v1))]
+                        [clenv (closure-env v1)]
                         [funarg (cons (fun-formal clfun) v2)]
                         [funmap (cons (fun-nameopt clfun) v1)]
                         [funbody (fun-body clfun)])
                  (if (eq? (fun-nameopt clfun) #f)
-                     (eval-under-genv funbody (cons funarg clenv) genv )
-                     (eval-under-genv funbody (cons funmap (cons funarg clenv)) genv )))
+                     (eval-under-genv funbody (cons funarg clenv) genv)
+                     (eval-under-env funbody (cons funmap (cons funarg clenv) genv))))
                (error "MUPL cannot call non-closure function")))]
 
         ;;case 6: apair expression
@@ -173,12 +168,6 @@
                (int 0)))]
 
         ;;CASES FOR ADDITIONAL REQUIREMENT
-        ;;additional req 1: glet expression
-        [(glet? e)
-         (letrec ([v (eval-under-genv (glet-e e) env genv)]
-                  [newenv (cons (cons (glet-var e) v) env)]
-                  [newgenv (cons (cons (glet-var e) v) genv)])
-           (eval-under-genv (glet-body e) newenv newgenv))]
 
         ;;additional req 2: mutable integer array
         [(num-array? e)
@@ -187,7 +176,7 @@
         [(num-array-at? e)
          (let ([array (eval-under-genv (num-array-at-e1 e) env genv)]
                [idx (num-array-at-e2 e)])
-           (cond [(not (num-array-object? array)) (error "MUPL array-at expects an array object as argument")]
+           (cond [(not (num-array-object? array)) (error "MUPL array search cannot be applied non-array value")]
                  [(< idx 0) (error "Array index out of bound error")]
                  [(null? array) (error "Array index out of bound error")]
                  [(>= idx (array-length array)) (error "Array index out of bound error")]
@@ -197,8 +186,8 @@
          (let ([array (eval-under-genv (num-array-set-e1 e) env genv)]
                [idx (num-array-set-e2 e)]
                [val (eval-under-genv (num-array-set-e3 e) env genv)])
-          (cond [(not (num-array-object? array)) (error "MUPL array-set expects an array object as argument")]
-                [(not (int? val)) (error "MUPL array expects int value")]
+          (cond [(not (num-array-object? array)) (error "MUPL array mutation cannot be applied non-array value")]
+                [(not (int? val)) (error "MUPL array cannot include non-int value")]
                 [(< idx 0) (error "Array index out of bound error")]
                 [(null? array) (error "Array index out of bound error")]
                 [(>= idx (array-length array)) (error "Array index out of bound error")]
@@ -304,7 +293,7 @@
         [(num-array-at? e)
          (let ([array (eval-under-env (num-array-at-e1 e) env)]
                [idx (num-array-at-e2 e)])
-           (cond [(not (num-array-object? array)) (error "MUPL array-at expects an array object as argument")]
+           (cond [(not (num-array-object? array)) (error "MUPL array search cannot be applied non-array value")]
                  [(< idx 0) (error "Array index out of bound error")]
                  [(null? array) (error "Array index out of bound error")]
                  [(>= idx (array-length array)) (error "Array index out of bound error")]
@@ -314,7 +303,7 @@
          (let ([array (eval-under-env (num-array-set-e1 e) env)]
                [idx (num-array-set-e2 e)]
                [val (eval-under-env (num-array-set-e3 e) env)])
-          (cond [(not (num-array-object? array)) (error "MUPL array-set expects an array object as argument")]
+          (cond [(not (num-array-object? array)) (error "MUPL array mutation cannot be applied non-array value")]
                 [(not (int? val)) (error "MUPL array cannot include non-int value")]
                 [(< idx 0) (error "Array index out of bound error")]
                 [(null? array) (error "Array index out of bound error")]
