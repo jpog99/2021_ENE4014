@@ -153,36 +153,36 @@ int main(int argc, char **argv)
     //transfer the stream input to host arrays
     for (int i = 0; i < input_size*input_size; ++i)
     {
-        input_in >> maxpool_input[i];
-        a_in >> a[i];
-        b_in >> b[i];
-        c_in >> c[i];
+        input_in >> h_maxpool_input[i];
+        a_in >> h_a[i];
+        b_in >> h_b[i];
+        c_in >> h_c[i];
     }
        
     // set thread, block dimensions
     const dim3 block_size(TILE_WIDTH, TILE_WIDTH);
-    const dim3 num_of_maxpool_blocks(maxpool_output_size/block_size.x+1, maxpool_output_size/block_size.y+1);//check
+    const dim3 num_of_maxpool_blocks(maxpool_output_size/block_size.x+1, maxpool_output_size/block_size.y+1);
     const dim3 num_of_blocks(input_size/block_size.x+1, input_size/block_size.y+1);
 
     // memory allocation for the device arrays (array used in GPU)
-    float *dev_mem_a, *dev_mem_b, *dev_mem_c, *dev_mem_input, *gemm_output, *maxpool_output;
-    cudaMalloc(&dev_mem_a, sizeof(float) * input_size * input_size);
-    cudaMalloc(&dev_mem_b, sizeof(float) * input_size * input_size);
-    cudaMalloc(&dev_mem_c, sizeof(float) * input_size * input_size);
-    cudaMalloc(&gemm_output, sizeof(float) * input_size * input_size);
-    cudaMalloc(&dev_mem_input, sizeof(float) * input_size * input_size);//check
-    cudaMalloc(&maxpool_output, sizeof(float) * maxpool_output_size * maxpool_output_size);//check
+    float *d_a, *d_b, *d_c, *d_input, *d_gemm_output, *d_maxpool_output;
+    cudaMalloc(&d_a, sizeof(float) * input_size * input_size);
+    cudaMalloc(&d_b, sizeof(float) * input_size * input_size);
+    cudaMalloc(&d_c, sizeof(float) * input_size * input_size);
+    cudaMalloc(&d_gemm_output, sizeof(float) * input_size * input_size);
+    cudaMalloc(&d_input, sizeof(float) * input_size * input_size);
+    cudaMalloc(&d_maxpool_output, sizeof(float) * maxpool_output_size * maxpool_output_size);
     
-    // copy host arrays to device array (so can be used in GPU kernel)
-    cudaMemcpy(dev_mem_a, a, sizeof(float) * input_size * input_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(dev_mem_b, b, sizeof(float) * input_size * input_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(dev_mem_c, c, sizeof(float) * input_size * input_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(dev_mem_input, maxpool_input, sizeof(float) * input_size * input_size, cudaMemcpyHostToDevice);//check
+    // copy host arrays to device array (so can be used in GPU CUDA kernel)
+    cudaMemcpy(d_a, h_a, sizeof(float) * input_size * input_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, h_b, sizeof(float) * input_size * input_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_c, h_c, sizeof(float) * input_size * input_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_input, h_maxpool_input, sizeof(float) * input_size * input_size, cudaMemcpyHostToDevice);//check
 
     // launch CUDA kernels
 
-    // First launch gemm kernel
-    gemm<<<num_of_blocks, block_size>>>(dev_mem_a, dev_mem_b, dev_mem_c, alpha, beta, gemm_output, input_size);
+    // First launch gemm kernel using GPU arrays
+    gemm<<<num_of_blocks, block_size>>>(d_a, d_b, d_c, alpha, beta, d_gemm_output, input_size);
     cudaDeviceSynchronize();
     cudaError_t error = cudaGetLastError();//check
     if(error!=cudaSuccess)
@@ -192,7 +192,7 @@ int main(int argc, char **argv)
     }
  
     // Then run maxpooling //check
-    maxpool<<<num_of_maxpool_blocks, block_size>>>(dev_mem_input, maxpool_output, input_size, filter_size);
+    maxpool<<<num_of_maxpool_blocks, block_size>>>(d_input, d_maxpool_output, input_size, filter_size);
     cudaDeviceSynchronize();
     error = cudaGetLastError();
     if(error!=cudaSuccess)
@@ -202,37 +202,37 @@ int main(int argc, char **argv)
     }
  
     // allocate output array in host (so host can catch the results from GPU kernel)
-    float *gemm_output_buf = (float*) malloc (sizeof(float)*input_size*input_size);
-    float *maxpool_output_buf = (float*) malloc (sizeof(float)*maxpool_output_size*maxpool_output_size);
+    float *h_gemm_output = (float*) malloc (sizeof(float)*input_size*input_size);
+    float *h_maxpool_output = (float*) malloc (sizeof(float)*maxpool_output_size*maxpool_output_size);
     
     // copy results from device to host (pass the result from GPU to host)
-    cudaMemcpy(gemm_output_buf, gemm_output, sizeof(float)*input_size*input_size, cudaMemcpyDeviceToHost);
-    cudaMemcpy(maxpool_output_buf, maxpool_output, sizeof(float)*maxpool_output_size*maxpool_output_size, cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_gemm_output, d_gemm_output, sizeof(float)*input_size*input_size, cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_maxpool_output, d_maxpool_output, sizeof(float)*maxpool_output_size*maxpool_output_size, cudaMemcpyDeviceToHost);
     
     // prints the results
     cout<<"\n========== GEMM OUTPUT ==========\n";
     for (int i = 0; i < input_size * input_size; i++)
     {
         if(i%input_size==0) cout<<"\n";
-        cout<<gemm_output_buf[i]<<" ";
+        cout<<h_gemm_output[i]<<" ";
     }
     cout<<"\n========== MAXPOOL OUTPUT ==========\n";
     for (int i = 0; i < maxpool_output_size * maxpool_output_size; i++)
     {
         if(i%maxpool_output_size==0) cout<<"\n";
-        cout<<maxpool_output_buf[i]<<" ";
+        cout<<h_maxpool_output[i]<<" ";
     }
     cout<<'\n';
 
     //free everything
-    cudaFree(dev_mem_a);
-    cudaFree(dev_mem_b);
-    cudaFree(dev_mem_c);
-    cudaFree(gemm_output);
-    cudaFree(dev_mem_input);
-    cudaFree(maxpool_output);
-    free(gemm_output_buf);
-    free(maxpool_output_buf);
+    cudaFree(d_a);
+    cudaFree(d_b);
+    cudaFree(d_c);
+    cudaFree(d_gemm_output);
+    cudaFree(d_input);
+    cudaFree(d_maxpool_output);
+    free(h_gemm_output);
+    free(h_maxpool_output);
 
     return 0;
 }
